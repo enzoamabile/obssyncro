@@ -105,6 +105,32 @@ class FileStore {
   }
 
   /**
+   * Create folder
+   */
+  createFolder(relativePath) {
+    const fullPath = this.getVaultPath(relativePath);
+
+    if (existsSync(fullPath)) {
+      throw new Error(`Path already exists: ${relativePath}`);
+    }
+
+    mkdirSync(fullPath, { recursive: true });
+
+    return {
+      path: relativePath,
+      type: 'folder',
+      mtime: Date.now()
+    };
+  }
+
+  /**
+   * Soft delete file (alias for delete)
+   */
+  softDelete(relativePath) {
+    return this.delete(relativePath);
+  }
+
+  /**
    * Delete file (move to trash)
    */
   delete(relativePath) {

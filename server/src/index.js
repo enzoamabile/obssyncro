@@ -193,20 +193,22 @@ app.post('/api/file/*', requireAuth, pathGuard, (req, res) => {
   const fileStore = new FileStore();
 
   try {
+    // Convert content to base64 for file-store
+    const base64Content = Buffer.from(content).toString('base64');
+
     // Calculate hash
     const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(content).digest('hex');
 
     // Write file
-    fileStore.write(filePath, content, hash);
+    const result = fileStore.write(filePath, base64Content);
 
     // Update database
-    const stats = fileStore.stats(filePath);
     fileOps.upsert(db, {
       path: filePath,
       type: 'file',
-      size: stats.size,
-      mtime: stats.mtime,
+      size: result.size,
+      mtime: result.mtime,
       hash
     });
 
@@ -218,7 +220,8 @@ app.post('/api/file/*', requireAuth, pathGuard, (req, res) => {
     res.json({
       success: true,
       path: filePath,
-      hash
+      hash,
+      size: result.size
     });
 
   } catch (error) {
