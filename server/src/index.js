@@ -5,12 +5,17 @@ import { getStateDB, sessionOps, fileOps } from './state-db.js';
 import { requireAuth, verifyAdminPassword, generateAccessToken, generateRefreshToken, verifyToken } from './auth.js';
 import { generalLimiter, authLimiter } from './middleware/rate-limit.js';
 import { pathGuard } from './middleware/path-guard.js';
+import WSHub from './ws-hub.js';
+import SyncHandler from './sync-handler.js';
+import FileStore from './file-store.js';
 
 // Validate config on startup
 config.validate();
 
 const app = express();
 const db = getStateDB();
+let wsHub = null;
+let syncHandler = null;
 
 // Middleware
 app.use(express.json({ limit: '100mb' }));
@@ -122,6 +127,33 @@ app.get('/api/manifest', requireAuth, (req, res) => {
   });
 });
 
+// Serve files from vault
+app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
+  const path = req.params[0]; // Everything after /api/files/
+  const fileStore = new FileStore();
+
+  try {
+    const file = fileStore.read(path);
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Set content type
+    res.setHeader('Content-Type', file.mime);
+    res.setHeader('Content-Length', file.size);
+    res.setHeader('Cache-Control', 'no-cache');
+
+    // Send base64 decoded content
+    const content = Buffer.from(file.content, 'base64');
+    res.send(content);
+
+  } catch (error) {
+    console.error(`Error serving file ${path}:`, error);
+    res.status(500).json({ error: 'Failed to read file' });
+  }
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
@@ -143,21 +175,31 @@ const server = app.listen(config.PORT, () => {
   console.log(`📁 Vault: ${config.VAULT_ROOT}`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully...');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+// Initialize WebSocket hub and sync handler
+wsHub = new WSHub(server);
+syncHandler = new SyncHandler(db, wsHub);
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully...');
+// Graceful shutdown
+const shutdown = () => {
+  console.log('Shutting down gracefully...');
+
+  if (wsHub) {
+    wsHub.shutdown();
+  }
+
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
-});
+
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 export { app };
