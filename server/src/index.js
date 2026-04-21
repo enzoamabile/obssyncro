@@ -26,6 +26,20 @@ let syncHandler = null;
 app.use(express.json({ limit: '100mb' }));
 app.use(cookieParser());
 
+// CORS middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
 // Serve static files from client
 const clientDistPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientDistPath));
