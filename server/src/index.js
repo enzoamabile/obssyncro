@@ -36,7 +36,9 @@ app.get('/health', (req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    env: config.NODE_ENV
+    env: config.NODE_ENV,
+    hasAdminEmail: !!config.ADMIN_EMAIL,
+    hasAdminHash: !!config.ADMIN_PASSWORD_HASH
   });
 });
 
