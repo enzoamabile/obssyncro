@@ -42,6 +42,20 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Test password verification (temporary, for debugging)
+app.get('/test-auth', async (req, res) => {
+  const testPassword = 'AdminPassword123!';
+  const isValid = await verifyAdminPassword(testPassword);
+
+  res.json({
+    testPassword,
+    adminEmail: config.ADMIN_EMAIL,
+    adminHashLength: config.ADMIN_PASSWORD_HASH?.length,
+    hashStart: config.ADMIN_PASSWORD_HASH?.substring(0, 10),
+    isValid
+  });
+});
+
 // Auth endpoints
 app.post('/auth/login', authLimiter, async (req, res) => {
   const { email, password } = req.body;
