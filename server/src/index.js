@@ -1,5 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { getStateDB, sessionOps, fileOps } from './state-db.js';
 import { requireAuth, verifyAdminPassword, generateAccessToken, generateRefreshToken, verifyToken } from './auth.js';
@@ -8,6 +10,9 @@ import { pathGuard } from './middleware/path-guard.js';
 import WSHub from './ws-hub.js';
 import SyncHandler from './sync-handler.js';
 import FileStore from './file-store.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Validate config on startup
 config.validate();
@@ -20,6 +25,10 @@ let syncHandler = null;
 // Middleware
 app.use(express.json({ limit: '100mb' }));
 app.use(cookieParser());
+
+// Serve static files from client
+const clientDistPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientDistPath));
 
 // Health check endpoint (public, no auth)
 app.get('/health', (req, res) => {
@@ -127,6 +136,154 @@ app.get('/api/manifest', requireAuth, (req, res) => {
   });
 });
 
+// List all files
+app.get('/api/list', requireAuth, (req, res) => {
+  try {
+    const manifest = fileOps.getManifest(db);
+
+    // Convert manifest to file list with metadata
+    const files = manifest.map(entry => ({
+      path: entry.path,
+      type: entry.type,
+      size: entry.size || 0,
+      mtime: entry.mtime || new Date().toISOString(),
+      hash: entry.hash || ''
+    }));
+
+    res.json({ files });
+  } catch (error) {
+    console.error('Error listing files:', error);
+    res.status(500).json({ error: 'Failed to list files' });
+  }
+});
+
+// Get file content
+app.get('/api/file/*', requireAuth, pathGuard, (req, res) => {
+  const filePath = req.params[0];
+  const fileStore = new FileStore();
+
+  try {
+    const file = fileStore.read(filePath);
+
+    if (!file) {
+      return res.status(404).json({ error: 'File not found' });
+    }
+
+    // Return JSON with content and metadata
+    const content = file.content.toString('utf8');
+
+    res.json({
+      path: filePath,
+      content,
+      hash: file.hash,
+      size: file.size,
+      mtime: file.mtime
+    });
+
+  } catch (error) {
+    console.error(`Error reading file ${filePath}:`, error);
+    res.status(500).json({ error: 'Failed to read file' });
+  }
+});
+
+// Create or update file
+app.post('/api/file/*', requireAuth, pathGuard, (req, res) => {
+  const filePath = req.params[0];
+  const { content } = req.body;
+  const fileStore = new FileStore();
+
+  try {
+    // Calculate hash
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256').update(content).digest('hex');
+
+    // Write file
+    fileStore.write(filePath, content, hash);
+
+    // Update database
+    const stats = fileStore.stats(filePath);
+    fileOps.upsert(db, {
+      path: filePath,
+      type: 'file',
+      size: stats.size,
+      mtime: stats.mtime,
+      hash
+    });
+
+    // Broadcast to WebSocket clients
+    if (syncHandler) {
+      syncHandler.handleLocalChange(filePath, content, hash);
+    }
+
+    res.json({
+      success: true,
+      path: filePath,
+      hash
+    });
+
+  } catch (error) {
+    console.error(`Error writing file ${filePath}:`, error);
+    res.status(500).json({ error: 'Failed to write file' });
+  }
+});
+
+// Delete file (soft delete)
+app.delete('/api/file/*', requireAuth, pathGuard, (req, res) => {
+  const filePath = req.params[0];
+  const fileStore = new FileStore();
+
+  try {
+    // Soft delete - move to trash
+    fileStore.softDelete(filePath);
+
+    // Remove from database
+    fileOps.delete(db, filePath);
+
+    // Broadcast to WebSocket clients
+    if (syncHandler) {
+      syncHandler.handleLocalDelete(filePath);
+    }
+
+    res.json({
+      success: true,
+      path: filePath
+    });
+
+  } catch (error) {
+    console.error(`Error deleting file ${filePath}:`, error);
+    res.status(500).json({ error: 'Failed to delete file' });
+  }
+});
+
+// Create folder
+app.post('/api/folder/*', requireAuth, pathGuard, (req, res) => {
+  const folderPath = req.params[0];
+  const fileStore = new FileStore();
+
+  try {
+    // Create folder
+    fileStore.createFolder(folderPath);
+
+    // Add to database
+    fileOps.upsert(db, {
+      path: folderPath,
+      type: 'folder',
+      size: 0,
+      mtime: new Date().toISOString(),
+      hash: ''
+    });
+
+    res.json({
+      success: true,
+      path: folderPath
+    });
+
+  } catch (error) {
+    console.error(`Error creating folder ${folderPath}:`, error);
+    res.status(500).json({ error: 'Failed to create folder' });
+  }
+});
+
 // Serve files from vault
 app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const path = req.params[0]; // Everything after /api/files/
@@ -154,9 +311,14 @@ app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
   }
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+// SPA fallback - serve index.html for non-API routes
+app.get('*', (req, res) => {
+  // Don't intercept API routes
+  if (req.path.startsWith('/api') || req.path.startsWith('/auth') || req.path === '/health' || req.path === '/ws') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  res.sendFile(path.join(clientDistPath, 'index.html'));
 });
 
 // Error handler
