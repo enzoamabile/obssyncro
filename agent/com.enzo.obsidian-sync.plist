@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.enzo.obsidian-sync</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/node</string>
+    <string>/Users/enzo/SVILUPPO/obsidian-sync/agent/src/index.js</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/enzo/SVILUPPO/obsidian-sync/agent</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key>
+    <string>production</string>
+  </dict>
+
+  <!-- Avvia al login -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Riavvia se crasha -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Aspetta 5 secondi prima di riavviare (evita loop rapidi) -->
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/obsidian-sync.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/obsidian-sync.err</string>
+</dict>
+</plist>

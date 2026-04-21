@@ -1,0 +1,28 @@
+{
+  "name": "obsidian-sync-server",
+  "version": "1.0.0",
+  "description": "Obsidian sync server - WebSocket + HTTP server with Web UI",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "client:dev": "cd client && npm run dev",
+    "client:build": "cd client && npm run build"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0",
+    "better-sqlite3": "^9.6.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcrypt": "^5.1.1",
+    "express-rate-limit": "^7.2.0",
+    "dotenv": "^16.4.5",
+    "cookie-parser": "^1.4.6"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "Enzo Amabile <enzoamabile@gmail.com>",
+  "license": "MIT"
+}

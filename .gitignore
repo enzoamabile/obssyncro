@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment files (contain secrets)
+.env
+agent/.env
+server/.env
+
+# Security keys (NEVER commit)
+KEYS.txt
+
+# Local database files
+server/data/state.db
+server/data/state.db-shm
+server/data/state.db-wal
+agent/state.db
+agent/state.db-shm
+agent/state.db-wal
+
+# Vault data (git-tracked files should be in the vault itself)
+server/data/vault/
+server/data/trash/
+
+# Svelte build output
+server/client/dist/
+
+# Logs
+*.log
+tmp/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Launchd logs (local agent)
+/tmp/obsidian-sync.*

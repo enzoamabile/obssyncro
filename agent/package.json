@@ -1,0 +1,22 @@
+{
+  "name": "obsidian-sync-agent",
+  "version": "1.0.0",
+  "description": "Obsidian sync agent - Mac daemon for real-time vault synchronization",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "ws": "^8.18.0",
+    "better-sqlite3": "^9.6.0",
+    "dotenv": "^16.4.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "author": "Enzo Amabile <enzoamabile@gmail.com>",
+  "license": "MIT"
+}
