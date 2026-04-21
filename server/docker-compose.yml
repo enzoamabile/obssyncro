@@ -5,8 +5,9 @@ services:
       dockerfile: Dockerfile
     container_name: obsidian-sync
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # Porta gestita da Dokploy reverse proxy, non esporre direttamente
+    # ports:
+    #   - "3000:3000"
     environment:
       - NODE_ENV=production
       # Vault and storage paths
