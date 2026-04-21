@@ -1,27 +1,36 @@
 <script>
   import { onMount } from 'svelte';
+  import { auth } from './stores/auth.js';
+  import { api } from './lib/api.js';
+  import Auth from './components/Auth.svelte';
+  import FileTree from './components/FileTree.svelte';
+  import Editor from './components/Editor.svelte';
 
   let loading = true;
-  let connected = false;
-  let error = null;
+  let healthCheck = false;
 
-  onMount(() => {
-    // Remove loading screen
-    setTimeout(() => {
-      loading = false;
-    }, 500);
-
-    // Check server connection
-    fetch('/health')
-      .then(res => res.json())
-      .then(() => {
-        connected = true;
-      })
-      .catch(err => {
-        error = 'Impossibile connettersi al server';
-        console.error(err);
-      });
+  onMount(async () => {
+    // Check if already authenticated
+    if ($auth.isAuthenticated) {
+      await verifyAuth();
+    }
+    loading = false;
   });
+
+  async function verifyAuth() {
+    try {
+      await api.health();
+      healthCheck = true;
+    } catch (err) {
+      console.error('Health check failed:', err);
+      auth.logout();
+    }
+  }
+
+  function handleLogout() {
+    auth.logout();
+    window.location.reload();
+  }
 </script>
 
 <div class="app">
@@ -30,38 +39,25 @@
       <div class="spinner"></div>
       <p>Caricamento...</p>
     </div>
-  {:else if error}
-    <div class="error">
-      <h1>⚠️ Errore</h1>
-      <p>{error}</p>
-      <button on:click={() => window.location.reload()}>Riprova</button>
-    </div>
+  {:else if !$auth.isAuthenticated}
+    <Auth />
   {:else}
     <div class="main">
       <header>
-        <h1>📝 Obsidian Sync</h1>
-        <div class="status" class:connected>
-          <span class="dot"></span>
-          {connected ? 'Online' : 'Offline'}
+        <div class="logo">
+          <h1>📝 Obsidian Sync</h1>
+          <span class="version">v1.0</span>
+        </div>
+        <div class="user">
+          <span class="email">{$auth.email}</span>
+          <button on:click={handleLogout} class="logout">Logout</button>
         </div>
       </header>
 
-      <main>
-        <div class="placeholder">
-          <h2>🚀 Benvenuto in Obsidian Sync</h2>
-          <p>L'interfaccia web è in fase di sviluppo.</p>
-          <p>Usa Obsidian sul Mac per sincronizzare le tue note.</p>
-
-          <div class="info">
-            <h3>📡 Server Status</h3>
-            <ul>
-              <li>✅ WebSocket Server: Attivo</li>
-              <li>✅ Database: Connesso</li>
-              <li>✅ Vault: Pronto</li>
-            </ul>
-          </div>
-        </div>
-      </main>
+      <div class="content">
+        <FileTree />
+        <Editor />
+      </div>
     </div>
   {/if}
 </div>
@@ -78,6 +74,7 @@
     height: 100vh;
     background: #1e1e1e;
     color: #dcddde;
+    overflow: hidden;
   }
 
   .loading {
@@ -102,35 +99,6 @@
     to { transform: rotate(360deg); }
   }
 
-  .error {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100vh;
-    gap: 20px;
-    text-align: center;
-  }
-
-  .error h1 {
-    font-size: 48px;
-    margin-bottom: 10px;
-  }
-
-  .error button {
-    padding: 10px 20px;
-    background: #7c3aed;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-  }
-
-  .error button:hover {
-    background: #6d28d9;
-  }
-
   .main {
     display: flex;
     flex-direction: column;
@@ -141,87 +109,73 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 15px 20px;
-    background: #252526;
+    padding: 0 20px;
+    height: 60px;
+    background: #1a1a1a;
     border-bottom: 1px solid #333;
   }
 
-  header h1 {
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo h1 {
     font-size: 20px;
     font-weight: 600;
+    margin: 0;
   }
 
-  .status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 5px 12px;
+  .logo .version {
+    font-size: 12px;
+    color: #666;
     background: #333;
+    padding: 2px 8px;
     border-radius: 4px;
-    font-size: 14px;
   }
 
-  .status.connected {
-    background: #1a4d1a;
-  }
-
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #999;
-  }
-
-  .status.connected .dot {
-    background: #4ade80;
-  }
-
-  main {
-    flex: 1;
+  .user {
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 40px;
+    gap: 15px;
   }
 
-  .placeholder {
-    max-width: 600px;
-    text-align: center;
-  }
-
-  .placeholder h2 {
-    font-size: 32px;
-    margin-bottom: 20px;
-  }
-
-  .placeholder p {
-    font-size: 16px;
-    color: #999;
-    line-height: 1.6;
-    margin-bottom: 10px;
-  }
-
-  .info {
-    margin-top: 40px;
-    padding: 20px;
-    background: #252526;
-    border-radius: 8px;
-    text-align: left;
-  }
-
-  .info h3 {
-    margin-bottom: 15px;
-    font-size: 18px;
-  }
-
-  .info ul {
-    list-style: none;
-    padding: 0;
-  }
-
-  .info li {
-    padding: 8px 0;
+  .user .email {
     font-size: 14px;
     color: #999;
+  }
+
+  .logout {
+    padding: 6px 12px;
+    background: #333;
+    color: #dcddde;
+    border: 1px solid #444;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .logout:hover {
+    background: #444;
+  }
+
+  .content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .content > :global(*) {
+    flex: 1;
+  }
+
+  :global(.file-tree) {
+    flex: 0 0 280px;
+    min-width: 280px;
+  }
+
+  :global(.editor-container) {
+    flex: 1;
   }
 </style>
