@@ -176,12 +176,14 @@ app.get('/api/list', requireAuth, (req, res) => {
 
     // Convert manifest to file list with metadata
     const files = manifest.map(entry => ({
-      path: entry.path,
+      path: entry.path, // Vault-prefixed path
       type: entry.type,
       size: entry.size || 0,
       mtime: entry.mtime || new Date().toISOString(),
       hash: entry.hash || ''
     }));
+
+    console.log(`📋 File list: ${files.length} files`);
 
     res.json({ files });
   } catch (error) {
@@ -196,7 +198,15 @@ app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const fileStore = new FileStore();
 
   try {
-    const file = fileStore.read(filePath);
+    // Extract vault prefix and relative path
+    const pathParts = filePath.split('/');
+    const vaultName = pathParts[0]; // First part is vault name
+    const relativePath = pathParts.slice(1).join('/'); // Rest is relative path
+
+    // Build server-side path: /data/vault/vault_name/relative_path
+    const serverFilePath = vaultName ? `${vaultName}/${relativePath}` : relativePath;
+
+    const file = fileStore.read(serverFilePath);
 
     if (!file) {
       return res.status(404).json({ error: 'File not found' });
@@ -206,7 +216,7 @@ app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
     const content = Buffer.from(file.content, 'base64').toString('utf8');
 
     res.json({
-      path: filePath,
+      path: filePath, // Return original vault-prefixed path
       content,
       hash: file.hash,
       size: file.size,
@@ -235,14 +245,22 @@ app.post('/api/files/*', requireAuth, pathGuard, (req, res) => {
     const crypto = require('crypto');
     const hash = crypto.createHash('sha256').update(content).digest('hex');
 
-    // Write file
-    const result = fileStore.write(filePath, base64Content);
+    // Extract vault prefix and relative path
+    const pathParts = filePath.split('/');
+    const vaultName = pathParts[0]; // First part is vault name
+    const relativePath = pathParts.slice(1).join('/'); // Rest is relative path
 
-    console.log(`✅ File written: ${filePath}, size: ${result.size}`);
+    // Build server-side path: /data/vault/vault_name/relative_path
+    const serverFilePath = vaultName ? `${vaultName}/${relativePath}` : relativePath;
 
-    // Update database
+    // Write file with server-side path
+    const result = fileStore.write(serverFilePath, base64Content);
+
+    console.log(`✅ File written: ${serverFilePath}, size: ${result.size}`);
+
+    // Update database with original path (vault-prefixed)
     fileOps.upsert(db, {
-      path: filePath,
+      path: filePath, // Keep vault-prefixed path
       type: 'file',
       size: result.size,
       mtime: result.mtime,
@@ -273,8 +291,18 @@ app.delete('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const fileStore = new FileStore();
 
   try {
+    // Extract vault prefix and relative path
+    const pathParts = filePath.split('/');
+    const vaultName = pathParts[0]; // First part is vault name
+    const relativePath = pathParts.slice(1).join('/'); // Rest is relative path
+
+    // Build server-side path: /data/vault/vault_name/relative_path
+    const serverFilePath = vaultName ? `${vaultName}/${relativePath}` : relativePath;
+
+    console.log(`🗑️  Deleting file: ${serverFilePath}`);
+
     // Soft delete - move to trash
-    fileStore.softDelete(filePath);
+    fileStore.softDelete(serverFilePath);
 
     // Remove from database
     fileOps.delete(db, filePath);
@@ -301,12 +329,22 @@ app.post('/api/folders/*', requireAuth, pathGuard, (req, res) => {
   const fileStore = new FileStore();
 
   try {
-    // Create folder
-    fileStore.createFolder(folderPath);
+    // Extract vault prefix and relative path
+    const pathParts = folderPath.split('/');
+    const vaultName = pathParts[0]; // First part is vault name
+    const relativePath = pathParts.slice(1).join('/'); // Rest is relative path
 
-    // Add to database
+    // Build server-side path: /data/vault/vault_name/relative_path
+    const serverFolderPath = vaultName ? `${vaultName}/${relativePath}` : relativePath;
+
+    console.log(`📁 Creating folder: ${serverFolderPath}`);
+
+    // Create folder with server-side path
+    fileStore.createFolder(serverFolderPath);
+
+    // Add to database with original vault-prefixed path
     fileOps.upsert(db, {
-      path: folderPath,
+      path: folderPath, // Keep vault-prefixed path
       type: 'folder',
       size: 0,
       mtime: new Date().toISOString(),
