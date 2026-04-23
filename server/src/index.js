@@ -202,8 +202,8 @@ app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
       return res.status(404).json({ error: 'File not found' });
     }
 
-    // Return JSON with content and metadata
-    const content = file.content.toString('utf8');
+    // Decode base64 content to text
+    const content = Buffer.from(file.content, 'base64').toString('utf8');
 
     res.json({
       path: filePath,
