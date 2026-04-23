@@ -86,14 +86,21 @@ function shouldIgnore(path) {
 
   // Check against ignore patterns
   for (const pattern of config.IGNORE_PATTERNS) {
-    // Convert glob pattern to regex
-    const regexPattern = pattern
-      .replace(/\*\*/g, '.*')
+    // Convert glob pattern to regex properly
+    let regexPattern = pattern
+      // Handle ** (matches any number of directories)
+      .replace(/\*\*/g, '⭐')
+      // Handle * (matches any filename, not directory separators)
       .replace(/\*/g, '[^/]*')
+      // Handle our temporary marker
+      .replace(/⭐/g, '(?:[^/]*(?:\/|$))*')
+      // Handle ? (matches any single character)
       .replace(/\?/g, '[^/]');
+
     const regex = new RegExp(`^${regexPattern}$`);
 
     if (regex.test(relativePath)) {
+      console.log(`🚫 Ignoring ${relativePath} (matched pattern: ${pattern})`);
       return true;
     }
   }
