@@ -191,7 +191,7 @@ app.get('/api/list', requireAuth, (req, res) => {
 });
 
 // Get file content
-app.get('/api/file/*', requireAuth, pathGuard, (req, res) => {
+app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const filePath = req.params[0];
   const fileStore = new FileStore();
 
@@ -220,7 +220,7 @@ app.get('/api/file/*', requireAuth, pathGuard, (req, res) => {
 });
 
 // Create or update file
-app.post('/api/file/*', requireAuth, pathGuard, (req, res) => {
+app.post('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const filePath = req.params[0];
   const { content } = req.body;
   const fileStore = new FileStore();
@@ -264,7 +264,7 @@ app.post('/api/file/*', requireAuth, pathGuard, (req, res) => {
 });
 
 // Delete file (soft delete)
-app.delete('/api/file/*', requireAuth, pathGuard, (req, res) => {
+app.delete('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const filePath = req.params[0];
   const fileStore = new FileStore();
 
@@ -292,7 +292,7 @@ app.delete('/api/file/*', requireAuth, pathGuard, (req, res) => {
 });
 
 // Create folder
-app.post('/api/folder/*', requireAuth, pathGuard, (req, res) => {
+app.post('/api/folders/*', requireAuth, pathGuard, (req, res) => {
   const folderPath = req.params[0];
   const fileStore = new FileStore();
 
@@ -322,6 +322,7 @@ app.post('/api/folder/*', requireAuth, pathGuard, (req, res) => {
 
 // Serve files from vault
 app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
+  const path = req.params[0]; // Everything after /api/files/
   const path = req.params[0]; // Everything after /api/files/
   const fileStore = new FileStore();
 

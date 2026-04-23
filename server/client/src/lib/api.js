@@ -32,27 +32,27 @@ export const api = {
     apiRequest('/api/list'),
 
   getFile: (path) =>
-    apiRequest(`/api/file${path}`),
+    apiRequest(`/api/files/${path}`),
 
   createFile: (path, content) =>
-    apiRequest(`/api/file${path}`, {
+    apiRequest(`/api/files/${path}`, {
       method: 'POST',
       body: JSON.stringify({ content })
     }),
 
   updateFile: (path, content) =>
-    apiRequest(`/api/file${path}`, {
+    apiRequest(`/api/files/${path}`, {
       method: 'POST',
       body: JSON.stringify({ content })
     }),
 
   deleteFile: (path) =>
-    apiRequest(`/api/file${path}`, {
+    apiRequest(`/api/files/${path}`, {
       method: 'DELETE'
     }),
 
   createFolder: (path) =>
-    apiRequest(`/api/folder${path}`, {
+    apiRequest(`/api/folders/${path}`, {
       method: 'POST'
     }),
 

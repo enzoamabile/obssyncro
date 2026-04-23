@@ -60,12 +60,17 @@ export class WebSocketClient {
 
   handleMessage(data) {
     switch (data.type) {
+      case 'connected':
+        console.log('✅ Server connected, session:', data.session_id);
+        this.sessionId = data.session_id;
+        break;
+
       case 'auth_success':
         console.log('✅ Authenticated');
         break;
 
       case 'error':
-        console.error('WebSocket error:', data.error);
+        console.error('WebSocket error:', data.message || data.error);
         break;
 
       case 'sync_request':
