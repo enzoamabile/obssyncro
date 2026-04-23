@@ -8,8 +8,9 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/bin/node</string>
-    <string>/Users/enzo/SVILUPPO/obsidian-sync/agent/src/index.js</string>
+    <string>/Users/enzo/.nvm/versions/node/v24.14.0/bin/node</string>
+    <string>/Users/enzo/.nvm/versions/node/v24.14.0/bin/npm</string>
+    <string>start</string>
   </array>
 
   <key>WorkingDirectory</key>
@@ -19,6 +20,8 @@
   <dict>
     <key>NODE_ENV</key>
     <string>production</string>
+    <key>PATH</key>
+    <string>/Users/enzo/.nvm/versions/node/v24.14.0/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>
 
   <!-- Avvia al login -->

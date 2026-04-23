@@ -10,8 +10,11 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '..', '.env') });
 
 export const config = {
-  // Vault paths
+  // Vault paths (multiple vaults supported)
   VAULT_ROOT: process.env.VAULT_ROOT || '/Users/enzo/OBS_Lavoro',
+  VAULT_ROOTS: process.env.VAULT_ROOTS
+    ? process.env.VAULT_ROOTS.split(',').map(p => p.trim())
+    : [process.env.VAULT_ROOT || '/Users/enzo/OBS_Lavoro'],
 
   // Server connection
   SERVER_URL: process.env.SERVER_URL || 'ws://localhost:3000/ws',
@@ -54,8 +57,11 @@ export const config = {
 
   // Validate config on startup
   validate() {
-    if (!existsSync(this.VAULT_ROOT)) {
-      throw new Error(`Vault root does not exist: ${this.VAULT_ROOT}`);
+    // Validate all vault roots exist
+    for (const vaultRoot of this.VAULT_ROOTS) {
+      if (!existsSync(vaultRoot)) {
+        throw new Error(`Vault root does not exist: ${vaultRoot}`);
+      }
     }
 
     if (!this.API_KEY) {

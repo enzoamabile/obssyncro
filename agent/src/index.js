@@ -18,7 +18,8 @@ class ObsidianSyncAgent {
   async start() {
     try {
       console.log('🚀 Obsidian Sync Agent starting...');
-      console.log(`📁 Vault: ${config.VAULT_ROOT}`);
+      console.log(`📁 Vault(s): ${config.VAULT_ROOTS.length} found`);
+      config.VAULT_ROOTS.forEach((vault, i) => console.log(`   ${i + 1}. ${vault}`));
       console.log(`🌐 Server: ${config.SERVER_URL}`);
 
       // Validate configuration
@@ -105,12 +106,15 @@ class ObsidianSyncAgent {
   startWatcher() {
     console.log('👀 Starting file watcher...');
 
+    // Watch all vault roots
+    const watchPaths = config.VAULT_ROOTS;
+
     this.watcher = new Watcher(async (path, type) => {
       if (this.shutdownInProgress) return;
 
       // Process file change
       await this.handleFileChange(path, type);
-    });
+    }, watchPaths);
 
     this.watcher.start();
   }
@@ -136,13 +140,28 @@ class ObsidianSyncAgent {
 
   async uploadFile(path) {
     try {
-      const fullPath = join(config.VAULT_ROOT, path);
+      // Extract vault name and relative path
+      const pathParts = path.split('/');
+      const vaultName = pathParts[0];
+      const relativePath = pathParts.slice(1).join('/');
+
+      // Find the vault root
+      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      if (!vaultRoot) {
+        console.log(`⏭️  Skipping file: ${path} (vault not found)`);
+        return;
+      }
+
+      const fullPath = join(vaultRoot, relativePath);
       const fileData = await readFileForSync(fullPath);
 
       if (!fileData) {
         console.log(`⏭️  Skipping file: ${path} (ignored or error)`);
         return;
       }
+
+      // Override the path in fileData with the vault-prefixed version
+      fileData.path = path;
 
       // Check if changed
       const existing = fileOps.get(this.db, path);
@@ -166,7 +185,19 @@ class ObsidianSyncAgent {
 
   async downloadFile(fileData) {
     try {
-      const fullPath = join(config.VAULT_ROOT, fileData.path);
+      // Extract vault name and relative path
+      const pathParts = fileData.path.split('/');
+      const vaultName = pathParts[0];
+      const relativePath = pathParts.slice(1).join('/');
+
+      // Find the vault root
+      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      if (!vaultRoot) {
+        console.log(`⏭️  Skipping download: ${fileData.path} (vault not found)`);
+        return;
+      }
+
+      const fullPath = join(vaultRoot, relativePath);
 
       console.log(`📥 Downloading: ${fileData.path}`);
 
@@ -191,7 +222,19 @@ class ObsidianSyncAgent {
 
   async writeReceivedFile(fileData) {
     try {
-      const fullPath = join(config.VAULT_ROOT, fileData.path);
+      // Extract vault name and relative path
+      const pathParts = fileData.path.split('/');
+      const vaultName = pathParts[0];
+      const relativePath = pathParts.slice(1).join('/');
+
+      // Find the vault root
+      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      if (!vaultRoot) {
+        console.log(`⏭️  Skipping write: ${fileData.path} (vault not found)`);
+        return;
+      }
+
+      const fullPath = join(vaultRoot, relativePath);
 
       console.log(`📥 Writing file from server: ${fileData.path}`);
 
@@ -216,7 +259,19 @@ class ObsidianSyncAgent {
 
   async deleteLocalFile(path) {
     try {
-      const fullPath = join(config.VAULT_ROOT, path);
+      // Extract vault name and relative path
+      const pathParts = path.split('/');
+      const vaultName = pathParts[0];
+      const relativePath = pathParts.slice(1).join('/');
+
+      // Find the vault root
+      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      if (!vaultRoot) {
+        console.log(`⏭️  Skipping delete: ${path} (vault not found)`);
+        return;
+      }
+
+      const fullPath = join(vaultRoot, relativePath);
 
       console.log(`🗑️  Deleting local file: ${path}`);
 
@@ -231,8 +286,26 @@ class ObsidianSyncAgent {
   async renameLocalFile(oldPath, newPath) {
     try {
       const fs = require('fs');
-      const fullOldPath = join(config.VAULT_ROOT, oldPath);
-      const fullNewPath = join(config.VAULT_ROOT, newPath);
+
+      // Extract vault names and relative paths
+      const oldPathParts = oldPath.split('/');
+      const newPathParts = newPath.split('/');
+      const oldVaultName = oldPathParts[0];
+      const newVaultName = newPathParts[0];
+      const oldRelativePath = oldPathParts.slice(1).join('/');
+      const newRelativePath = newPathParts.slice(1).join('/');
+
+      // Find the vault roots
+      const oldVaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(oldVaultName));
+      const newVaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(newVaultName));
+
+      if (!oldVaultRoot || !newVaultRoot) {
+        console.log(`⏭️  Skipping rename: vault(s) not found`);
+        return;
+      }
+
+      const fullOldPath = join(oldVaultRoot, oldRelativePath);
+      const fullNewPath = join(newVaultRoot, newRelativePath);
 
       console.log(`📝 Renaming: ${oldPath} -> ${newPath}`);
 
@@ -240,51 +313,62 @@ class ObsidianSyncAgent {
       fileOps.rename(this.db, oldPath, newPath);
 
     } catch (error) {
-      console.error(`Error renaming file: ${error.message}`);
+      console.error(`Error renaming file:`, error.message);
     }
   }
 
   async scanVault() {
     const files = [];
 
-    const scanDir = (dir) => {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
+    // Scan all vault roots
+    for (const vaultRoot of config.VAULT_ROOTS) {
+      const vaultName = vaultRoot.split('/').filter(Boolean).pop();
+      console.log(`📂 Scanning vault: ${vaultName} (${vaultRoot})`);
 
-      for (const entry of entries) {
-        const fullPath = join(dir, entry.name);
-        const relativePath = getRelativePath(fullPath);
+      const scanDir = (dir, vaultPrefix = '') => {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
 
-        // Skip ignored
-        if (config.IGNORE_PATTERNS.some(pattern => {
-          const regexPattern = pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
-          return new RegExp(`^${regexPattern}$`).test(relativePath);
-        })) {
-          continue;
-        }
+        for (const entry of entries) {
+          const fullPath = join(dir, entry.name);
+          const relativePath = getRelativePath(fullPath);
 
-        if (entry.isDirectory()) {
-          scanDir(fullPath);
-        } else if (entry.isFile()) {
-          try {
-            const stats = fs.statSync(fullPath);
-            const { createHash } = require('crypto');
-            const content = fs.readFileSync(fullPath);
-            const hash = 'sha256:' + createHash('sha256').update(content).digest('hex');
+          // Add vault prefix to create unique paths
+          const vaultRelativePath = vaultPrefix ? `${vaultPrefix}/${relativePath}` : relativePath;
 
-            files.push({
-              path: relativePath,
-              hash: hash,
-              mtime: stats.mtimeMs
-            });
-          } catch (error) {
-            // Skip files that can't be read
+          // Skip ignored
+          if (config.IGNORE_PATTERNS.some(pattern => {
+            const regexPattern = pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
+            return new RegExp(`^${regexPattern}$`).test(relativePath);
+          })) {
+            continue;
+          }
+
+          if (entry.isDirectory()) {
+            scanDir(fullPath, vaultPrefix);
+          } else if (entry.isFile()) {
+            try {
+              const stats = fs.statSync(fullPath);
+              const { createHash } = require('crypto');
+              const content = fs.readFileSync(fullPath);
+              const hash = 'sha256:' + createHash('sha256').update(content).digest('hex');
+
+              files.push({
+                path: vaultRelativePath,
+                hash: hash,
+                mtime: stats.mtimeMs,
+                vault: vaultName
+              });
+            } catch (error) {
+              // Skip files that can't be read
+            }
           }
         }
-      }
-    };
+      };
 
-    scanDir(config.VAULT_ROOT);
+      scanDir(vaultRoot, vaultName);
+    }
 
+    console.log(`📊 Total files found: ${files.length}`);
     return files;
   }
 

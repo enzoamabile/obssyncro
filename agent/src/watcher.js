@@ -7,8 +7,9 @@ import { readFileForSync } from './file-handler.js';
  * File Watcher - Monitors vault for changes using chokidar
  */
 class Watcher {
-  constructor(onChange) {
+  constructor(onChange, watchPaths = null) {
     this.onChange = onChange;
+    this.watchPaths = watchPaths || config.VAULT_ROOTS;
     this.watcher = null;
     this.pendingChanges = new Map(); // Debounce pending changes
     this.debounceTimers = new Map();
@@ -19,12 +20,11 @@ class Watcher {
    */
   start() {
     console.log(`👀 Starting file watcher...`);
-    console.log(`   Vault: ${config.VAULT_ROOT}`);
+    console.log(`   Watching ${this.watchPaths.length} vault(s):`);
+    this.watchPaths.forEach((path, i) => console.log(`   ${i + 1}. ${path}`));
 
-    const watchPath = config.VAULT_ROOT;
-
-    // Initialize chokidar
-    this.watcher = chokidar.watch(watchPath, {
+    // Initialize chokidar with multiple paths
+    this.watcher = chokidar.watch(this.watchPaths, {
       ignored: config.IGNORE_PATTERNS,
       persistent: true,
       ignoreInitial: false, // Process existing files on startup
