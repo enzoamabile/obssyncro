@@ -174,16 +174,49 @@ app.get('/api/list', requireAuth, (req, res) => {
   try {
     const manifest = fileOps.getManifest(db);
 
-    // Convert manifest to file list with metadata
-    const files = manifest.map(entry => ({
-      path: entry.path, // Vault-prefixed path
-      type: entry.type,
-      size: entry.size || 0,
-      mtime: entry.mtime || new Date().toISOString(),
-      hash: entry.hash || ''
-    }));
+    // Build folder structure from file paths
+    const folders = new Set();
+    const files = [];
 
-    console.log(`📋 File list: ${files.length} files`);
+    manifest.forEach(entry => {
+      const pathParts = entry.path.split('/').filter(Boolean);
+
+      // Extract folder paths
+      for (let i = 1; i < pathParts.length; i++) {
+        const folderPath = pathParts.slice(0, i).join('/');
+        folders.add(folderPath);
+      }
+
+      // Add file
+      files.push({
+        path: entry.path,
+        type: entry.type || 'file',
+        size: entry.size || 0,
+        mtime: entry.mtime || new Date().toISOString(),
+        hash: entry.hash || ''
+      });
+    });
+
+    // Add folders to the list
+    folders.forEach(folderPath => {
+      files.push({
+        path: folderPath,
+        type: 'folder',
+        size: 0,
+        mtime: new Date().toISOString(),
+        hash: ''
+      });
+    });
+
+    // Sort: folders first, then files, alphabetically
+    files.sort((a, b) => {
+      if (a.type !== b.type) {
+        return a.type === 'folder' ? -1 : 1;
+      }
+      return a.path.localeCompare(b.path);
+    });
+
+    console.log(`📋 File list: ${files.length} items (${folders.size} folders, ${manifest.length} files)`);
 
     res.json({ files });
   } catch (error) {

@@ -72,7 +72,8 @@
 
       parts.forEach((part, index) => {
         currentPath += (currentPath ? '/' : '') + part;
-        const isFolder = index < parts.length - 1;
+        const isLastPart = index === parts.length - 1;
+        const isFolder = file.type === 'folder' || !isLastPart;
 
         let existing = currentLevel.find(item => item.name === part);
 
