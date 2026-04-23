@@ -226,6 +226,8 @@ app.post('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const fileStore = new FileStore();
 
   try {
+    console.log(`📝 Writing file: ${filePath}`);
+
     // Convert content to base64 for file-store
     const base64Content = Buffer.from(content).toString('base64');
 
@@ -236,30 +238,32 @@ app.post('/api/files/*', requireAuth, pathGuard, (req, res) => {
     // Write file
     const result = fileStore.write(filePath, base64Content);
 
+    console.log(`✅ File written: ${filePath}, size: ${result.size}`);
+
     // Update database
     fileOps.upsert(db, {
       path: filePath,
       type: 'file',
       size: result.size,
       mtime: result.mtime,
-      hash
+      hash: `sha256:${hash}`
     });
 
     // Broadcast to WebSocket clients
     if (syncHandler) {
-      syncHandler.handleLocalChange(filePath, content, hash);
+      syncHandler.handleLocalChange(filePath, content, `sha256:${hash}`);
     }
 
     res.json({
       success: true,
       path: filePath,
-      hash,
+      hash: `sha256:${hash}`,
       size: result.size
     });
 
   } catch (error) {
-    console.error(`Error writing file ${filePath}:`, error);
-    res.status(500).json({ error: 'Failed to write file' });
+    console.error(`❌ Error writing file ${filePath}:`, error);
+    res.status(500).json({ error: 'Failed to write file', details: error.message });
   }
 });
 

@@ -65,10 +65,8 @@ export class WebSocketClient {
         this.sessionId = data.session_id;
         break;
 
+      case 'auth':
       case 'auth_success':
-        console.log('✅ Authenticated');
-        break;
-
       case 'authenticated':
         console.log('✅ Authenticated');
         break;
