@@ -115,7 +115,7 @@
             <span class="name">${item.name}</span>
           </div>
         </div>
-        ${item.type === 'folder' && isFolder && item.children ? renderTree(item.children, level + 1).join('') : ''}
+        ${item.type === 'folder' && isExpanded && item.children ? renderTree(item.children, level + 1).join('') : ''}
       `;
     });
   }

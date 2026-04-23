@@ -69,6 +69,10 @@ export class WebSocketClient {
         console.log('✅ Authenticated');
         break;
 
+      case 'authenticated':
+        console.log('✅ Authenticated');
+        break;
+
       case 'error':
         console.error('WebSocket error:', data.message || data.error);
         break;
