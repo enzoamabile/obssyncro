@@ -53,10 +53,19 @@ export function verifyToken(token) {
 }
 
 /**
- * Middleware to verify JWT access token from cookie
+ * Middleware to verify JWT access token from cookie or Authorization header
  */
 export function requireAuth(req, res, next) {
-  const token = req.cookies?.access_token;
+  // Try cookie first (for web UI)
+  let token = req.cookies?.access_token;
+
+  // Fall back to Authorization header (for API clients)
+  if (!token && req.headers?.authorization) {
+    const authHeader = req.headers.authorization;
+    if (authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+  }
 
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized: No token provided' });

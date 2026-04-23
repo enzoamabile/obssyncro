@@ -97,6 +97,85 @@ class SyncHandler {
       const serverFile = serverManifest.get(clientFile.path);
 
       if (!serverFile) {
+        // New file on client - ALWAYS push
+        console.log(`📤 New file on client: ${clientFile.path}`);
+        pushToServer.push(clientFile.path);
+      } else if (serverFile.hash !== clientFile.hash) {
+        // Hash mismatch - compare mtimes
+        if (clientFile.mtime > serverFile.mtime) {
+          // Client version is newer
+          console.log(`📤 Newer version on client: ${clientFile.path}`);
+          pushToServer.push(clientFile.path);
+        } else {
+          // Server version is newer
+          console.log(`📥 Newer version on server: ${clientFile.path}`);
+          const serverFileData = this.fileStore.read(serverFile.path);
+          if (serverFileData) {
+            pullFromServer.push({
+              path: serverFile.path,
+              content: serverFileData.content,
+              hash: serverFile.hash,
+              mtime: serverFile.mtime
+            });
+          }
+        }
+      } else {
+        // Same hash - no action needed
+        console.log(`✅ File already in sync: ${clientFile.path}`);
+      }
+    }
+
+    // Check what client needs to pull (new files on server)
+    for (const [path, serverFile] of serverManifest.entries()) {
+      const clientFile = clientFiles.find(f => f.path === path);
+
+      if (!clientFile) {
+        // New file on server
+        console.log(`📥 New file on server: ${path}`);
+        const serverFileData = this.fileStore.read(path);
+        if (serverFileData) {
+          pullFromServer.push({
+            path,
+            content: serverFileData.content,
+            hash: serverFile.hash,
+            mtime: serverFile.mtime
+          });
+        }
+      }
+    }
+
+    // Send sync_delta
+    this.wsHub.sendTo(sessionId, {
+      type: 'sync_delta',
+      push_to_server: pushToServer,
+      pull_from_server: pullFromServer
+    });
+
+    console.log(`📊 Sync delta: ${pushToServer.length} push, ${pullFromServer.length} pull`);
+    const { files: clientFiles } = message;
+    const conn = this.wsHub.getConnection(sessionId);
+
+    if (!conn) {
+      return;
+    }
+
+    console.log(`📋 Sync manifest from ${sessionId}: ${clientFiles.length} files`);
+
+    // Get server manifest
+    const serverFiles = fileOps.getManifest(this.db);
+    const serverManifest = new Map(
+      serverFiles.map(f => [f.path, f])
+    );
+
+    // Calculate delta
+    const pushToServer = [];
+    const pullFromServer = [];
+
+    // Check what client needs to push
+    for (const clientFile of clientFiles) {
+      const serverFile = serverManifest.get(clientFile.path);
+
+      if (!serverFile) {
         // New file on client
         pushToServer.push(clientFile.path);
       } else if (serverFile.hash !== clientFile.hash) {
