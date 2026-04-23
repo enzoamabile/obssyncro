@@ -323,7 +323,6 @@ app.post('/api/folders/*', requireAuth, pathGuard, (req, res) => {
 // Serve files from vault
 app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const path = req.params[0]; // Everything after /api/files/
-  const path = req.params[0]; // Everything after /api/files/
   const fileStore = new FileStore();
 
   try {
