@@ -121,17 +121,38 @@ class ObsidianSyncAgent {
 
   async handleFileChange(path, type) {
     try {
-      const relativePath = getRelativePath(path);
+      // Find which vault this file belongs to
+      let vaultName = null;
+      let vaultRoot = null;
+      let relativePath = null;
+
+      for (const root of config.VAULT_ROOTS) {
+        if (path.startsWith(root)) {
+          vaultRoot = root;
+          vaultName = root.split('/').filter(Boolean).pop();
+          // Get relative path by removing the vault root
+          relativePath = path.substring(root.length + 1);
+          break;
+        }
+      }
+
+      if (!vaultRoot) {
+        console.log(`⏭️  Skipping file change: ${path} (vault not found)`);
+        return;
+      }
+
+      // Create vault-prefixed path
+      const vaultPrefixedPath = `${vaultName}/${relativePath}`;
 
       if (type === 'delete') {
-        console.log(`🗑️  Deleting file: ${relativePath}`);
-        this.syncClient.sendFileDelete(relativePath);
-        fileOps.delete(this.db, relativePath);
+        console.log(`🗑️  Deleting file: ${vaultPrefixedPath}`);
+        this.syncClient.sendFileDelete(vaultPrefixedPath);
+        fileOps.delete(this.db, vaultPrefixedPath);
         return;
       }
 
       // Upload new/modified file
-      await this.uploadFile(relativePath);
+      await this.uploadFile(vaultPrefixedPath);
 
     } catch (error) {
       console.error(`Error handling file change: ${error.message}`);
@@ -140,15 +161,19 @@ class ObsidianSyncAgent {
 
   async uploadFile(path) {
     try {
-      // Extract vault name and relative path
+      // Path should be in vault-prefixed format: "vaultName/relative/path"
       const pathParts = path.split('/');
       const vaultName = pathParts[0];
       const relativePath = pathParts.slice(1).join('/');
 
       // Find the vault root
-      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      const vaultRoot = config.VAULT_ROOTS.find(root => {
+        const rootName = root.split('/').filter(Boolean).pop();
+        return rootName === vaultName;
+      });
+
       if (!vaultRoot) {
-        console.log(`⏭️  Skipping file: ${path} (vault not found)`);
+        console.log(`⏭️  Skipping file: ${path} (vault "${vaultName}" not found)`);
         return;
       }
 
@@ -170,7 +195,7 @@ class ObsidianSyncAgent {
         return;
       }
 
-      console.log(`📤 Uploading: ${path}`);
+      console.log(`📤 Uploading: ${path} (vault: ${vaultName})`);
 
       // Send to server
       this.syncClient.sendFileUpsert(fileData);
@@ -191,7 +216,11 @@ class ObsidianSyncAgent {
       const relativePath = pathParts.slice(1).join('/');
 
       // Find the vault root
-      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      const vaultRoot = config.VAULT_ROOTS.find(root => {
+        const rootName = root.split('/').filter(Boolean).pop();
+        return rootName === vaultName;
+      });
+
       if (!vaultRoot) {
         console.log(`⏭️  Skipping download: ${fileData.path} (vault not found)`);
         return;
@@ -199,7 +228,7 @@ class ObsidianSyncAgent {
 
       const fullPath = join(vaultRoot, relativePath);
 
-      console.log(`📥 Downloading: ${fileData.path}`);
+      console.log(`📥 Downloading: ${fileData.path} (vault: ${vaultName})`);
 
       // Write file to disk
       const content = Buffer.from(fileData.content, 'base64');
@@ -228,7 +257,11 @@ class ObsidianSyncAgent {
       const relativePath = pathParts.slice(1).join('/');
 
       // Find the vault root
-      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      const vaultRoot = config.VAULT_ROOTS.find(root => {
+        const rootName = root.split('/').filter(Boolean).pop();
+        return rootName === vaultName;
+      });
+
       if (!vaultRoot) {
         console.log(`⏭️  Skipping write: ${fileData.path} (vault not found)`);
         return;
@@ -236,7 +269,7 @@ class ObsidianSyncAgent {
 
       const fullPath = join(vaultRoot, relativePath);
 
-      console.log(`📥 Writing file from server: ${fileData.path}`);
+      console.log(`📥 Writing file from server: ${fileData.path} (vault: ${vaultName})`);
 
       // Write file
       const content = Buffer.from(fileData.content, 'base64');
@@ -265,7 +298,11 @@ class ObsidianSyncAgent {
       const relativePath = pathParts.slice(1).join('/');
 
       // Find the vault root
-      const vaultRoot = config.VAULT_ROOTS.find(root => root.endsWith(vaultName));
+      const vaultRoot = config.VAULT_ROOTS.find(root => {
+        const rootName = root.split('/').filter(Boolean).pop();
+        return rootName === vaultName;
+      });
+
       if (!vaultRoot) {
         console.log(`⏭️  Skipping delete: ${path} (vault not found)`);
         return;
@@ -273,7 +310,7 @@ class ObsidianSyncAgent {
 
       const fullPath = join(vaultRoot, relativePath);
 
-      console.log(`🗑️  Deleting local file: ${path}`);
+      console.log(`🗑️  Deleting local file: ${path} (vault: ${vaultName})`);
 
       await fsPromises.unlink(fullPath);
       fileOps.delete(this.db, path);
@@ -325,15 +362,18 @@ class ObsidianSyncAgent {
       const vaultName = vaultRoot.split('/').filter(Boolean).pop();
       console.log(`📂 Scanning vault: ${vaultName} (${vaultRoot})`);
 
-      const scanDir = (dir, vaultPrefix = '') => {
+      const scanDir = (dir) => {
         const entries = fs.readdirSync(dir, { withFileTypes: true });
 
         for (const entry of entries) {
           const fullPath = join(dir, entry.name);
-          const relativePath = getRelativePath(fullPath);
 
-          // Add vault prefix to create unique paths
-          const vaultRelativePath = vaultPrefix ? `${vaultPrefix}/${relativePath}` : relativePath;
+          // Create vault-prefixed path for tracking
+          let relativePath = fullPath.substring(vaultRoot.length);
+          if (relativePath.startsWith('/')) {
+            relativePath = relativePath.substring(1);
+          }
+          const vaultPrefixedPath = `${vaultName}/${relativePath}`;
 
           // Skip ignored
           if (config.IGNORE_PATTERNS.some(pattern => {
@@ -344,7 +384,7 @@ class ObsidianSyncAgent {
           }
 
           if (entry.isDirectory()) {
-            scanDir(fullPath, vaultPrefix);
+            scanDir(fullPath);
           } else if (entry.isFile()) {
             try {
               const stats = fs.statSync(fullPath);
@@ -353,7 +393,7 @@ class ObsidianSyncAgent {
               const hash = 'sha256:' + createHash('sha256').update(content).digest('hex');
 
               files.push({
-                path: vaultRelativePath,
+                path: vaultPrefixedPath,
                 hash: hash,
                 mtime: stats.mtimeMs,
                 vault: vaultName
@@ -365,7 +405,7 @@ class ObsidianSyncAgent {
         }
       };
 
-      scanDir(vaultRoot, vaultName);
+      scanDir(vaultRoot);
     }
 
     console.log(`📊 Total files found: ${files.length}`);

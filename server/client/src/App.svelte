@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { auth } from './stores/auth.js';
+  import { auth, login, logout } from './stores/auth.js';
   import { api } from './lib/api.js';
   import Auth from './components/Auth.svelte';
   import FileTree from './components/FileTree.svelte';
@@ -23,12 +23,12 @@
       healthCheck = true;
     } catch (err) {
       console.error('Health check failed:', err);
-      auth.logout();
+      logout();
     }
   }
 
   function handleLogout() {
-    auth.logout();
+    logout();
     window.location.reload();
   }
 </script>
