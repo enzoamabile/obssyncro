@@ -25,6 +25,7 @@ class FileStore {
 
   /**
    * Get full file path in vault
+   * relativePath format: "vault-name/subfolder/file.md"
    */
   getVaultPath(relativePath) {
     // Security: prevent path traversal
@@ -38,7 +39,21 @@ class FileStore {
       throw new Error('Path traversal not allowed');
     }
 
-    return join(config.VAULT_ROOT, normalized);
+    // Extract vault name from path (first directory component)
+    const parts = normalized.split('/');
+    if (parts.length === 0 || parts[0] === '') {
+      throw new Error('Invalid path: missing vault name');
+    }
+
+    const vaultName = parts[0];
+    
+    // Create vault directory if it doesn't exist
+    const vaultDir = join(config.VAULT_ROOT, vaultName);
+    this.ensureDir(vaultDir);
+
+    // Return full path within vault directory
+    const remainingPath = parts.slice(1).join('/');
+    return remainingPath ? join(vaultDir, remainingPath) : vaultDir;
   }
 
   /**
