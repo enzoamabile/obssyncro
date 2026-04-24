@@ -232,13 +232,8 @@ app.get('/api/files/*', requireAuth, pathGuard, (req, res) => {
   const fileStore = new FileStore();
 
   try {
-    // Extract vault prefix and relative path
-    const pathParts = filePath.split('/');
-    const vaultName = pathParts[0]; // First part is vault name
-    const relativePath = pathParts.slice(1).join('/'); // Rest is relative path
-
-    // Build server-side path: /data/vault/vault_name/relative_path
-    const serverFilePath = vaultName ? `${vaultName}/${relativePath}` : relativePath;
+    // Build server-side path (already includes vault name)
+    const serverFilePath = filePath;
 
     const file = fileStore.read(serverFilePath);
 
