@@ -2,6 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 import { config } from './config.js';
 import { getStateDB, sessionOps, fileOps } from './state-db.js';
 import { requireAuth, verifyAdminPassword, generateAccessToken, generateRefreshToken, verifyToken } from './auth.js';
@@ -275,16 +276,17 @@ app.post('/api/files/*', requireAuth, pathGuard, (req, res) => {
     const base64Content = Buffer.from(content).toString('base64');
 
     // Calculate hash
-    const crypto = require('crypto');
-    const hash = crypto.createHash('sha256').update(content).digest('hex');
+    const hash = createHash('sha256').update(content).digest('hex');
 
     // Extract vault prefix and relative path
+    // filePath format: "vault-name/relative/path/to/file.md"
+    // Could also be "vault-name/vault-name/file.md" if vault has subfolder with same name
     const pathParts = filePath.split('/');
     const vaultName = pathParts[0]; // First part is vault name
     const relativePath = pathParts.slice(1).join('/'); // Rest is relative path
 
-    // Build server-side path: /data/vault/vault_name/relative_path
-    const serverFilePath = vaultName ? `${vaultName}/${relativePath}` : relativePath;
+    // Build server-side path (already includes vault name)
+    const serverFilePath = filePath;
 
     // Write file with server-side path
     const result = fileStore.write(serverFilePath, base64Content);

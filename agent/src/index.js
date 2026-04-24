@@ -6,6 +6,7 @@ import { readFileForSync, getRelativePath } from './file-handler.js';
 import { promises as fsPromises } from 'fs';
 import { join } from 'path';
 import fs from 'fs';
+import { createHash } from 'crypto';
 
 class ObsidianSyncAgent {
   constructor() {
@@ -388,7 +389,6 @@ class ObsidianSyncAgent {
           } else if (entry.isFile()) {
             try {
               const stats = fs.statSync(fullPath);
-              const { createHash } = require('crypto');
               const content = fs.readFileSync(fullPath);
               const hash = 'sha256:' + createHash('sha256').update(content).digest('hex');
 

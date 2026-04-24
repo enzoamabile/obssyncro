@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync, statSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, renameSync, statSync, readdirSync, rmSync } from 'fs';
 import { join, dirname, basename } from 'path';
 import { config } from './config.js';
 import { validateExtension, getMimeType } from './middleware/file-validator.js';
@@ -246,8 +246,7 @@ class FileStore {
       return [];
     }
 
-    const fs = require('fs');
-    const items = fs.readdirSync(fullPath, { withFileTypes: true });
+    const items = readdirSync(fullPath, { withFileTypes: true });
 
     return items.map(item => ({
       name: item.name,
@@ -289,8 +288,7 @@ class FileStore {
     const fullTrashPath = join(config.TRASH_PATH, trashPath);
 
     if (existsSync(fullTrashPath)) {
-      const fs = require('fs');
-      fs.rmSync(fullTrashPath, { recursive: true, force: true });
+      rmSync(fullTrashPath, { recursive: true, force: true });
       return true;
     }
 
@@ -301,19 +299,18 @@ class FileStore {
    * Clean old trash files (older than specified days)
    */
   cleanTrash(maxAgeDays = 30) {
-    const fs = require('fs');
     const now = Date.now();
     const maxAge = maxAgeDays * 24 * 60 * 60 * 1000;
     let deleted = 0;
 
-    const timestamps = fs.readdirSync(config.TRASH_PATH);
+    const timestamps = readdirSync(config.TRASH_PATH);
 
     for (const timestamp of timestamps) {
       const timestampPath = join(config.TRASH_PATH, timestamp);
       const stats = statSync(timestampPath);
 
       if (now - stats.mtimeMs > maxAge) {
-        fs.rmSync(timestampPath, { recursive: true, force: true });
+        rmSync(timestampPath, { recursive: true, force: true });
         deleted++;
       }
     }
